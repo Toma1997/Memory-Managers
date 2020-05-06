@@ -2,14 +2,14 @@
 #include <stdio.h>
 using namespace std;
 
-// Convert all Gb and Mb to Kb if necessary.
+// Convert all GB and MB to KB if necessary.
 int converter(string valueOfBytes) {
     int size = valueOfBytes.length();
     string byt = valueOfBytes.substr(size-2,size);
     int value =  stoi(valueOfBytes.substr(0,size-2));
-    if (byt == "Mb")
+    if (byt == "MB")
         value *= 1024;
-    else if (byt == "Gb")
+    else if (byt == "GB")
         value *= 1024*1024;
     return value;
 }
@@ -22,47 +22,48 @@ bool insert(int &fileSize, string fileName, int *diskBlocks,  map<string, vector
             filePointers[fileName] = {{i, fileSize}}; // Value {blockIndex, file size part in that block}.
             currentSize += fileSize;
             return true;
-        } else { 
-            // File can be inserted in 2 blocks, so make chunks of file.
-            if (i<7  &&  diskBlocks[i] > 0 && diskBlocks[i+1] >= fileSize - diskBlocks[i]) {
-                filePointers[fileName] = {{i, diskBlocks[i]}, {i+1, fileSize - diskBlocks[i]}};
-                diskBlocks[i+1] -= fileSize - diskBlocks[i];
+        } 
+        // File can be inserted in 2 blocks, so make chunks of file.
+        bool canInsertInCurrentBlock = i<7  &&  diskBlocks[i] > 0;
+        bool canInsertInSecondBlock = diskBlocks[i+1] >= fileSize - diskBlocks[i];
+        if (canInsertInCurrentBlock && canInsertInSecondBlock) {
+            filePointers[fileName] = {{i, diskBlocks[i]}, {i+1, fileSize - diskBlocks[i]}};
+            diskBlocks[i+1] -= fileSize - diskBlocks[i];
+            diskBlocks[i] = 0;
+            currentSize += fileSize;
+            return true;
+        }
+        // File must be chunked in more than 2 blocks.
+        bool canInsertInNextBlocks = diskBlocks[i+1] == blockMaxSize  &&  fileSize >= 2*blockMaxSize;
+        if (canInsertInCurrentBlock && canInsertInNextBlocks) {
+            int restBlocks = (fileSize - diskBlocks[i])/blockMaxSize;
+            int pieceOfLastBlock = (fileSize - diskBlocks[i]) % blockMaxSize;
+            int indeksBlokBound = i + restBlocks + 1;
+            if (pieceOfLastBlock > 0)
+                indeksBlokBound += 1;
+            if (indeksBlokBound > 8) { // File is bigger than current free space.
+                return false;
+            }
+            int freeSpace = 0;
+            for (int ind = i;ind < indeksBlokBound; ind++) 	{
+                freeSpace += diskBlocks[ind];
+            }
+            bool freeSpaceIsEqualOrBiggerThanPartOfFile = freeSpace >= diskBlocks[i] + restBlocks * blockMaxSize + pieceOfLastBlock;
+            if (freeSpaceIsEqualOrBiggerThanPartOfFile) {
+                filePointers[fileName] = {{i, diskBlocks[i]}, {indeksBlokBound-1, blockMaxSize}};
+                if (pieceOfLastBlock > 0) { // In last block is only part occupied.
+                    diskBlocks[indeksBlokBound-1] -= pieceOfLastBlock;
+                    filePointers[fileName][1][1] = pieceOfLastBlock;
+                    indeksBlokBound--;
+                }
                 diskBlocks[i] = 0;
+                i++;
+                while (i < indeksBlokBound) {
+                    diskBlocks[i] = 0;
+                    i++;
+                }
                 currentSize += fileSize;
                 return true;
-            }
-            // File must be chunked in more than 2 blocks.
-            if (i<7  &&  diskBlocks[i] > 0  &&  diskBlocks[i+1] == blockMaxSize  &&  fileSize >= 2*blockMaxSize) {
-                int restBlocks = (fileSize - diskBlocks[i])/blockMaxSize;
-                int pieceOfLastBlock = (fileSize - diskBlocks[i]) % blockMaxSize;
-                int indeksBlokBound = i + restBlocks + 1;
-                if (pieceOfLastBlock > 0)
-                    indeksBlokBound += 1;
-                if (indeksBlokBound <= 8) {
-                    int freeSpace = 0;
-                    for (int ind = i;ind < indeksBlokBound; ind++) 	{
-                        freeSpace += diskBlocks[ind];
-                    }
-                    // Free space must be >= than part of fileSize.
-                    if (freeSpace >= diskBlocks[i] + restBlocks * blockMaxSize + pieceOfLastBlock) {
-                        filePointers[fileName] = {{i, diskBlocks[i]}, {indeksBlokBound-1, blockMaxSize}};
-                        if (pieceOfLastBlock > 0) { // In last block is only part occupied.
-                            diskBlocks[indeksBlokBound-1] -= pieceOfLastBlock;
-                            filePointers[fileName][1][1] = pieceOfLastBlock;
-                            indeksBlokBound--;
-                        }
-                        diskBlocks[i] = 0;
-                        i++;
-                        while (i < indeksBlokBound) {
-                            diskBlocks[i] = 0;
-                            i++;
-                        }
-                        currentSize += fileSize;
-                        return true;
-                    }
-                } else { // File is bigger than current free space.
-                    return false;
-                }
             }
         }
     }
@@ -160,7 +161,7 @@ int main() {
         cin >> N;
         if (N == 0) break;
         cin >> diskSize;
-        maxDiskSize = converter(diskSize); // disk size Kb, Mb, Gb converted to Kb
+        maxDiskSize = converter(diskSize); // disk size KB, MB, GB converted to KB
         map<string, vector<vector<int>>> filePointers;
         int currentSize = 0;
         int blockMaxSize = maxDiskSize/8;
@@ -179,7 +180,7 @@ int main() {
             int fileSize;
             if (command == "insert")    {
                 cin >> fileName; // NAME
-                cin >> T;        // T => 1Kb,1Gb,...
+                cin >> T;        // T => 1KB,1GB,...
                 fileSize = converter(T);
                 if (fileSize > maxDiskSize - currentSize) {
                     printf("%s \n", "ERROR: Disk is full!");

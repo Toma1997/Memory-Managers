@@ -12,18 +12,18 @@ Next n lines is command insert, remove or optimize, commands are in format:
  - optimize
 
 3
-8Kb
-insert f1 7Kb
-insert f2 3Mb
+8KB
+insert f1 7KB
+insert f2 3MB
 remove f1
 6
 8Mb
-insert f1 4Mb
-insert f2 1Mb
-insert f3 512Kb
+insert f1 4MB
+insert f2 1MB
+insert f3 512KB
 remove f1
 remove f1
-insert f1 5Mb
+insert f1 5MB
 0
 
 Example output:
